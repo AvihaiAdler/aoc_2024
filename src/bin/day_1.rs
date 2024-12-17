@@ -62,7 +62,7 @@ fn sum_distance(first: &mut [i32], second: &mut [i32]) -> i32 {
     first.sort();
     second.sort();
 
-    return zip(first, second)
+    zip(first, second)
         .map(|(a, b)| (*a - *b).abs())
-        .fold(0, |acc, i| acc + i);
+        .fold(0, |acc, i| acc + i)
 }
