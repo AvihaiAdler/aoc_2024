@@ -3,9 +3,10 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::iter::zip;
 
+use aoc2024::get_reader;
+
 fn main() -> io::Result<()> {
-    let file = File::open("resources/day_1.txt")?;
-    let reader = BufReader::new(file);
+    let reader = get_reader("resources/day_1.txt")?;
 
     let all_numbers = get_all_numbers(reader);
     let (mut first, mut second) = split(&all_numbers);
