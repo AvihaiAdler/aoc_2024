@@ -41,11 +41,7 @@ fn sum_narrow_multiplications(tokens: &[Token]) -> usize {
         match *token {
             Token::Do => flag = true,
             Token::Dont => flag = false,
-            Token::Mul(a, b) => {
-                if flag {
-                    res += a * b
-                }
-            }
+            Token::Mul(a, b) if flag => res += a * b,
             _ => continue,
         }
     }
