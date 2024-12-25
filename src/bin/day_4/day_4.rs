@@ -2,129 +2,129 @@ use aoc2024::get_reader;
 use std::fs;
 use std::io::{self, BufRead, BufReader};
 
-#[derive(Clone, Copy)]
-enum Orientation {
-    Up,
-    Down,
-    Left,
-    Right,
-    DiagUpLeft,
-    DiagUpRight,
-    DiagDownLeft,
-    DiagDownRight,
-}
-
-struct Direction {
-    direction: Orientation,
-    row: usize,
-    col: usize,
-}
-
-impl Direction {
-    fn new(direction: Orientation, row: usize, col: usize) -> Self {
-        Self {
-            direction,
-            row,
-            col,
-        }
-    }
-
-    fn advance(&self) -> Self {
-        match self.direction {
-            Orientation::Up => {
-                Self::new(self.direction, self.row.wrapping_add_signed(-1), self.col)
-            }
-            Orientation::Down => {
-                Self::new(self.direction, self.row.wrapping_add_signed(1), self.col)
-            }
-            Orientation::Left => {
-                Self::new(self.direction, self.row, self.col.wrapping_add_signed(-1))
-            }
-            Orientation::Right => {
-                Self::new(self.direction, self.row, self.col.wrapping_add_signed(1))
-            }
-            Orientation::DiagDownLeft => Self::new(
-                self.direction,
-                self.row.wrapping_add_signed(1),
-                self.col.wrapping_add_signed(-1),
-            ),
-            Orientation::DiagDownRight => Self::new(
-                self.direction,
-                self.row.wrapping_add_signed(1),
-                self.col.wrapping_add_signed(1),
-            ),
-            Orientation::DiagUpLeft => Self::new(
-                self.direction,
-                self.row.wrapping_add_signed(-1),
-                self.col.wrapping_add_signed(-1),
-            ),
-            Orientation::DiagUpRight => Self::new(
-                self.direction,
-                self.row.wrapping_add_signed(-1),
-                self.col.wrapping_add_signed(1),
-            ),
-        }
-    }
-}
+mod direction;
+use direction::{Direction, Orientation};
 
 fn main() -> io::Result<()> {
     let reader = get_reader("resources/day_4.txt")?;
     let data = get_data(reader);
 
     let needle = "XMAS";
-    let amount = search_for(&data, needle);
-    println!("found {amount} occurrences of '{needle}'");
+    let words = search_for(&data, needle);
+    println!("found {} occurrences of '{needle}'", words.iter().count());
 
+    let words = search_for(&data, &needle[1..]);
+
+    /*
+     * get all coord with diagonal orientation
+     * adjust those coord such that they point to the letter 'A' (pivot)
+     * get all permutations of those coords
+     * find pairs such that they share the same pivot but their orientation is different
+     */
+    let diagonals = words
+        .iter()
+        .filter(|&dir| Orientation::diagonal(dir.orientation))
+        .map(|dir| adjust_coord(dir))
+        .collect::<Vec<_>>();
+
+    let crossed = diagonals
+        .iter()
+        .map(|first| {
+            diagonals
+                .iter()
+                .map(|second| (first.clone(), second.clone()))
+        })
+        .flatten()
+        .filter(|(first, second)| first.orientation != second.orientation)
+        .filter(|(first, second)| first.orientation.inverse() != second.orientation)
+        .filter(|(first, second)| first.row == second.row)
+        .filter(|(first, second)| first.col == second.col)
+        .count();
+
+    println!("found {} diagonally crossed 'MAS'", crossed / 2);
     Ok(())
 }
 
-fn search(data: &[Vec<char>], direction: &Direction, string: &str) -> bool {
+/**
+ * adjust the coordination such that the point represent the letter 'A'
+ */
+fn adjust_coord(direction: &Direction) -> Direction {
+    match direction.orientation {
+        Orientation::DiagDownLeft => {
+            Direction::new(direction.orientation, direction.row + 1, direction.col - 1)
+        }
+        Orientation::DiagDownRight => {
+            Direction::new(direction.orientation, direction.row + 1, direction.col + 1)
+        }
+        Orientation::DiagUpLeft => {
+            Direction::new(direction.orientation, direction.row - 1, direction.col - 1)
+        }
+        Orientation::DiagUpRight => {
+            Direction::new(direction.orientation, direction.row - 1, direction.col + 1)
+        }
+        _ => direction.clone(),
+    }
+}
+
+fn search(data: &[Vec<char>], direction: &Direction, string: &str) -> Option<Orientation> {
     let c = string.chars().next();
     if c == None {
-        return true;
+        return Some(direction.orientation);
     }
 
     if data.get(direction.row) == None {
-        return false;
+        return None;
     }
 
     if data[direction.row].get(direction.col) == None {
-        return false;
+        return None;
     }
 
     if data[direction.row][direction.col] != c.unwrap() {
-        return false;
+        return None;
     }
 
     return search(data, &direction.advance(), &string[1..]);
 }
 
-fn search_for(data: &[Vec<char>], string: &str) -> usize {
+/**
+ * search for a string.
+ * returns Direction where Direction::row & Direction::col point to the last letter in the string,
+ * and Direction::Orientation represent the orientation of the string as if it was read backwards
+ */
+fn search_for(data: &[Vec<char>], string: &str) -> Vec<Direction> {
+    let string = string.chars().rev().collect::<String>();
+
     let rows = data.len();
     let cols = data[0].len();
 
-    let mut res = 0;
+    let mut res = Vec::new();
     for row in 0..rows {
         for col in 0..cols {
             if data[row][col] != string.chars().next().unwrap() {
                 continue;
             }
 
-            let lookups = [
-                Direction::new(Orientation::Up, row, col).advance(),
-                Direction::new(Orientation::Down, row, col).advance(),
-                Direction::new(Orientation::Left, row, col).advance(),
-                Direction::new(Orientation::Right, row, col).advance(),
-                Direction::new(Orientation::DiagDownLeft, row, col).advance(),
-                Direction::new(Orientation::DiagDownRight, row, col).advance(),
-                Direction::new(Orientation::DiagUpLeft, row, col).advance(),
-                Direction::new(Orientation::DiagUpRight, row, col).advance(),
-            ];
+            let needles = [
+                Orientation::Up,
+                Orientation::Down,
+                Orientation::Left,
+                Orientation::Right,
+                Orientation::DiagDownLeft,
+                Orientation::DiagDownRight,
+                Orientation::DiagUpLeft,
+                Orientation::DiagUpRight,
+            ]
+            .iter()
+            .map(|orientation| Direction::new(*orientation, row, col))
+            .map(|direction| direction.advance())
+            .map(|direction| search(data, &direction, &string[1..]))
+            .filter(Option::is_some)
+            .map(Option::unwrap)
+            .map(|orientation| Direction::new(orientation, row, col))
+            .collect::<Vec<_>>();
 
-            res += lookups
-                .iter()
-                .map(|direction| search(data, direction, &string[1..]))
-                .fold(0, |acc, result| acc + if result { 1 } else { 0 });
+            res = res.iter().chain(needles.iter()).cloned().collect();
         }
     }
 
