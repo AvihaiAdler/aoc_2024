@@ -75,6 +75,8 @@ fn starts_with(stream: &[Token], expr: &[Token]) -> bool {
 }
 
 fn second_pass(tokens: &[Token]) -> Vec<Token> {
+    use std::mem::discriminant;
+
     let mul = [
         Token::Mul(0, 0),
         Token::OpenParen,
@@ -92,10 +94,11 @@ fn second_pass(tokens: &[Token]) -> Vec<Token> {
         if starts_with(window, mul.as_slice()) {
             let op = window
                 .iter()
-                .filter(|&e| std::mem::discriminant(e) == std::mem::discriminant(&Token::Number(0)))
-                .map(|e| match *e {
-                    Token::Number(a) => a,
-                    _ => unreachable!(),
+                .filter_map(|e| match e {
+                    Token::Number(a) if discriminant(e) == discriminant(&Token::Number(0)) => {
+                        Some(*a)
+                    }
+                    _ => None,
                 })
                 .collect::<Vec<_>>();
 
